@@ -1,12 +1,15 @@
 Se colocan algunos comandos:
 
-para montar el archivo del tp me posiciono en la carpeta en la que se encuentra el archivo como en el siguiente ejemplo
-$ sudo mount $(pwd)/test.img /mnt -o loop,umask=000
+-para montar el archivo del tp me posiciono en la carpeta en la que se encuentra el archivo y puedo usar cualquiera de los siguientes comandos:
 
-para recuperar un archivo (en progreso):
+--$ sudo mount $(pwd)/test.img /mnt -o loop,umask=000   <--(VM lubuntu)
 
-$ gcc recuperar.c -o recuperar
-$ ./recuperar  /root/lapapa.txt
+--$ sudo mount -t vfat -o umask=000 test.img /mnt   <--(en debian 11)
 
-ver archivo a bajo nivel (sin sudo porque pincha)
-$ ghex nombre_ arhivo_con_extension
+-para recuperar un archivo (en progreso):
+
+-- $ gcc recuperar.c -o recuperar
+-- $ ./recuperar  /root/lapapa.txt
+
+-ver archivo a bajo nivel (sin sudo)
+--$ ghex nombre_ arhivo_con_extension
