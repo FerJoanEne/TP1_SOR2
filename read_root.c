@@ -51,7 +51,7 @@ int main() {
     PartitionTable pt[4];
     Fat12BootSector bs;
     Fat12Entry entry;
-   
+    
 	//{...} Completar 
     
     for(i=0; i<4; i++) {        

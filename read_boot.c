@@ -27,8 +27,8 @@ int main() {
     int i;
     PartitionTable pt[4];
     Fat12BootSector bs;
-    
-    fseek(in, ... , SEEK_SET); // Ir al inicio de la tabla de particiones. Completar ...
+
+    fseek(in, 0x01 , SEEK_SET); // Ir al inicio de la tabla de particiones. Completar ...
     fread(pt, sizeof(PartitionTable), 4, in); // leo entradas 
     
     for(i=0; i<4; i++) {        
