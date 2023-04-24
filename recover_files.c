@@ -15,7 +15,7 @@ enum EstadoEntradaFAT { //Dentro de la Fat table, los estados que puede tomar un
   RESERVADO,
   EN_USO,
   MAL_SECTOR,
-  EOF
+  EOF_
 }; 
 typedef struct {
     unsigned char first_byte;
@@ -139,15 +139,13 @@ enum EstadoEntradaFAT valorFatAEstadoFat(unsigned short valor){
     } else if (valor == 0x0FF7){
         return MAL_SECTOR;
     } else if (valor >= 0x0FF8){
-        return EOF;
+        return EOF_;
     } else{
         return EN_USO;
     }    
 }
 
-
-
-void mostrarDirectorios(char ruta[], unsigned short cant_entries, FILE * in, Fat12BootSector bs, long int offset) {
+void recuperarArchivos(char ruta[], unsigned short cant_entries, FILE * in, Fat12BootSector bs, long int offset) {
     fseek(in, offset, SEEK_SET);
     Fat12Entry entry;
     Fat12Entry* pentry = &entry;
@@ -155,14 +153,20 @@ void mostrarDirectorios(char ruta[], unsigned short cant_entries, FILE * in, Fat
     enum TipoEntry tipo;
     bool esBorrado;
     bool esOculto;
+    long int offset_buffer;
     char nombre[256] = ""; //Maxima longitud de nombre en FAT12
     char nombreAux[256] = "";
     char nombreLongAux[14];
     char rutaAux[512];
+    char buffer[bs.sectors_per_cluster* bs.sector_size +1];
     unsigned short numero_cluster;
     unsigned long posicionActual;
+    unsigned long posicionActualAux;
     int i;
-    for(i=0; i<cant_entries; i++) {       
+    char primerByte[1] = "R"; //0x52
+    char primerByteLongName[1] = "A";//0x41
+    for(i=0; i<cant_entries; i++) {      
+        posicionActual = ftell(in); 
         fread(&entry, sizeof(entry), 1, in);
         switch(pentry->filename[0]) {
         case 0x00:
@@ -188,29 +192,39 @@ void mostrarDirectorios(char ruta[], unsigned short cant_entries, FILE * in, Fat
         //Ya sabemos el tipo de la entry
         switch(tipo) {
         case ARCHIVO:
-            printf("A%c%c: %s%s\n", caracterBorrado(esBorrado),caracterOculto(esOculto), ruta, nombre);
-            nombre[0] = '\0';
+            if (esBorrado){
+                posicionActualAux = ftell(in);             
+                fseek(in, posicionActual, SEEK_SET); 
+                fwrite(primerByte, 1, 1, in);     //R de recuperado       
+                fseek(in, posicionActualAux, SEEK_SET);
+                printf("Se ha recuperado el Directory Entry (Archivo) en la posición %08lX.\n", posicionActual);
+            }
             break;
         case LONGFILENAME:            
-            strcpy(nombreAux, nombre);
-            nombre[0] = '\0';
-            obtenerNombreLongFilenameEntry(nombreLongAux,   (Fat12LongFileNameEntry*)pentry);
-            strcat(nombre, nombreLongAux); //va obteniendo el nombre de estas entries
-            strcat(nombre, nombreAux);
+            if (esBorrado){
+                posicionActualAux = ftell(in);             
+                fseek(in, posicionActual, SEEK_SET); 
+                fwrite(primerByteLongName, 1, 1, in);     //R de recuperado       
+                fseek(in, posicionActualAux, SEEK_SET); 
+                printf("Se ha recuperado el Long File Name Directory Entry en la posición %08lX.\n", posicionActual);
+            }
             break;
         case DIRECTORIO:
-            printf("D%c%c: %s%s\n", caracterBorrado(esBorrado),caracterOculto(esOculto), ruta, nombre);
-            strcpy(rutaAux, ruta);
-            strcat(rutaAux, nombre);
+            if (esBorrado){
+                posicionActualAux = ftell(in);             
+                fseek(in, posicionActual, SEEK_SET); 
+                fwrite(primerByte, 1, 1, in);     //R de recuperado       
+                fseek(in, posicionActualAux, SEEK_SET); 
+                printf("Se ha recuperado el Directory Entry (Directorio) en la posición %08lX.\n", posicionActual);
+            }
             posicionActual = ftell(in);
             numero_cluster = pentry->cluster_adress_low;
-            mostrarDirectorios(rutaAux, (unsigned short)((bs.sectors_per_cluster * bs.sector_size)/sizeof(Fat12Entry)), in, bs, inicio_clusters+ ((numero_cluster)-2)*bs.sectors_per_cluster* bs.sector_size);
+            recuperarArchivos("/", (unsigned short)((bs.sectors_per_cluster * bs.sector_size)/sizeof(Fat12Entry)), in, bs, inicio_clusters+ ((numero_cluster)-2)*bs.sectors_per_cluster* bs.sector_size);
             while (valorFatAEstadoFat(getValorEnTablaFat(bs, in, numero_cluster) == EN_USO)){
-                numero_cluster = getValorEnTablaFat;
-                mostrarDirectorios(rutaAux, (unsigned short)((bs.sectors_per_cluster * bs.sector_size)/sizeof(Fat12Entry)), in, bs, inicio_clusters+ ((numero_cluster)-2)*bs.sectors_per_cluster* bs.sector_size);
+                numero_cluster = getValorEnTablaFat(bs, in, numero_cluster);
+                recuperarArchivos("/", (unsigned short)((bs.sectors_per_cluster * bs.sector_size)/sizeof(Fat12Entry)), in, bs, inicio_clusters+ ((numero_cluster)-2)*bs.sectors_per_cluster* bs.sector_size);
             }            
             fseek(in, posicionActual, SEEK_SET); //volvemos a donde estabamos
-            nombre[0] = '\0';
             break;
         default:
             continue;
@@ -218,26 +232,8 @@ void mostrarDirectorios(char ruta[], unsigned short cant_entries, FILE * in, Fat
     }
 }
 
-void print_file_info(Fat12Entry *entry) {
-    switch(entry->filename[0]) {
-    case 0x00:
-        return; // unused entry
-    case 0xE5: 
-        printf("Archivo borrado: [?%.7s.%.3s]\n", entry->filename + 1, entry->filename + 8); //verificar que este bien
-        return;
-    default:
-        if (CHECK_BIT(entry->attributes, 5)){ //bit que indica si es directorio
-            printf("Directorio: [%.8s.%.3s]\n", entry->filename, entry->filename + 8);
-        }else if (CHECK_BIT(entry->attributes, 0) && CHECK_BIT(entry->attributes, 1) && CHECK_BIT(entry->attributes, 2) && CHECK_BIT(entry->attributes, 3)){
-            //printf("Long File Name Entry: [%.13s]\n", obtenerNombreLongFilenameEntry((Fat12LongFileNameEntry*)entry));
-        }else{
-            printf("Archivo: [%.8s.%.3s]\n", entry->filename, entry->filename + 8);
-        }
-    }    
-}
-
 int main() {
-    FILE * in = fopen("test.img", "rb");
+    FILE * in = fopen("test.img", "rb+");
     int i;
     PartitionTable pt[4];
     Fat12BootSector bs;
@@ -248,31 +244,23 @@ int main() {
     
     for(i=0; i<4; i++) {        
         if(pt[i].partition_type == 1) {
-            printf("Encontrada particion FAT12 %d\n", i);
+            //printf("Encontrada particion FAT12 %d\n", i);
             break;
         }
     }
     
     if(i == 4) {
-        printf("No encontrado filesystem FAT12, saliendo...\n");
+        //printf("No encontrado filesystem FAT12, saliendo...\n");
         return -1;
     }
-    
+
     fseek(in, 0, SEEK_SET);
     fread(&bs, sizeof(Fat12BootSector), 1, in);
     
-    printf("En  0x%lX, sector size %d, FAT size %d sectors, %d FATs\n\n", 
-           ftell(in), bs.sector_size, bs.fat_size_sectors, bs.number_of_fats);
-           
+    printf("---Recuperando archivos---\n");
     long int offset = ftell(in) + (bs.reserved_sectors-1 + bs.fat_size_sectors * bs.number_of_fats) * bs.sector_size;
-    printf("Root dir_entries %d \n", bs.root_dir_entries);
-    //for(i=0; i<bs.root_dir_entries; i++) {
-    //    fread(&entry, sizeof(entry), 1, in);
-    //    print_file_info(&entry);
-    //}
-    mostrarDirectorios("/", bs.root_dir_entries, in, bs, offset);
+    recuperarArchivos("/", bs.root_dir_entries, in, bs, offset);
 
-    printf("\nLeido Root directory, ahora en 0x%lX\n", ftell(in));
     fclose(in);
     return 0;
 }

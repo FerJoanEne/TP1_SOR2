@@ -187,7 +187,7 @@ void mostrarDirectorios(char ruta[], unsigned short cant_entries, FILE * in, Fat
         //Ya sabemos el tipo de la entry
         switch(tipo) {
         case ARCHIVO:
-            printf("A%c%c: 0x%lX:%s%s\n", caracterBorrado(esBorrado),caracterOculto(esOculto), posicionActual, ruta, nombre);
+            printf("A%c%c:0x%08lX:%s%s\n", caracterBorrado(esBorrado),caracterOculto(esOculto), posicionActual, ruta, nombre);
             nombre[0] = '\0';
             break;
         case LONGFILENAME:            
@@ -198,7 +198,7 @@ void mostrarDirectorios(char ruta[], unsigned short cant_entries, FILE * in, Fat
             strcat(nombre, nombreAux);
             break;
         case DIRECTORIO:
-            printf("D%c%c: 0x%lX:%s%s\n", caracterBorrado(esBorrado),caracterOculto(esOculto), posicionActual,ruta, nombre);
+            printf("D%c%c:0x%08lX:%s%s\n", caracterBorrado(esBorrado),caracterOculto(esOculto), posicionActual,ruta, nombre);
             strcpy(rutaAux, ruta);
             strcat(rutaAux, nombre);
             strcat(rutaAux, "/");
@@ -230,7 +230,7 @@ int main() {
     
     for(i=0; i<4; i++) {        
         if(pt[i].partition_type == 1) {
-            printf("Encontrada particion FAT12 %d\n", i);
+            //printf("Encontrada particion FAT12 %d\n", i);
             break;
         }
     }
